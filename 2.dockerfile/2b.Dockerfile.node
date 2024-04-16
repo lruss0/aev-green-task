@@ -1,0 +1,20 @@
+FROM node
+
+RUN apt-get update -y && apt-get install -y \
+    git \
+    ca-certificates \
+    build-essential
+
+RUN apt clean & rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY ./app/package*.json ./
+
+RUN npm install
+
+COPY ./app/src ./src
+
+USER node
+
+ENTRYPOINT ["npm", "run", "prod"]
+

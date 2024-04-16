@@ -1,0 +1,31 @@
+#!/bin/sh
+
+PATTERN=$1
+SEARCH_URL=$2
+
+if [ "$PATTERN" = "" ] | [ "$SEARCH_URL" = "" ]; then
+    # HTTP 400 Bad Request
+    echo "400"
+    echo "Неверно составлен запрос."
+    echo "-----------------------------------------------------------------"
+    echo "/bin/bash test-site <pattern> <url>"
+    echo "         <pattern>   Строка, которую искать (регистронезависимая)"
+    echo "         <url>       URL сайта, где искать."
+    echo "-----------------------------------------------------------------"
+else
+    # Проверяем, жив ли сайт. Curl write-out HTTP CODE, остальное в /dev/null
+    STATUS_CODE=`curl -sL -w "%{http_code}\n" "$SEARCH_URL" -o /dev/null`
+    # Если код ответа HTTP 200 OK, тогда проверяем контент
+    if [ "$STATUS_CODE" = "200" ]; then
+        # Вытаскиваем контент, в нижнем регистре все для удобства
+        CHECK=`curl "$SEARCH_URL" --silent | grep -iF "$PATTERN"`
+        if [ "$CHECK" = "" ]; then
+            # HTTP 204 No Content
+            echo "204"
+        else
+            echo "200"
+        fi
+    else
+        echo $STATUS_CODE
+    fi
+fi

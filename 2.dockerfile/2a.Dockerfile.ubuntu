@@ -1,0 +1,51 @@
+FROM ubuntu:20.04
+# Для nodejs зачем использовать ubuntu? Есть готовый node
+# Предположим, что надо именно ubuntu:20.04
+# отдельным файлом версия на базе node:latest
+
+# Пускай приложение работает не под root, для этого добавим входящие аргументы
+ARG user
+ARG uid
+#ARG user=test
+#ARG uid=1111
+
+# При билде в UBUNTU хочет часовой пояс, добавляю возможность указать
+ARG timezone
+#ARG timezone=Europe/Moscow
+ENV TZ=$timezone
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Добавил набор компоненты для билда, гит
+# Обычно еще ставлю openssl, ca-certificates, curl, но не стал включать в этот раз
+
+RUN apt-get update -y && apt-get install -y \
+    git \
+    nodejs \
+    npm \
+    build-essential
+
+# В конце можно почистить мусор после установки
+RUN apt clean & rm -rf /var/lib/apt/lists/*
+
+# Базовая настройка npm
+# Сперва package и установка, потом исходники докинем
+WORKDIR /app
+COPY ./app/package*.json ./
+
+RUN npm install
+
+COPY ./app/src ./src
+
+# Дефолтный порт npm
+EXPOSE 3000
+
+# Добавляем пользователя и переключаемся на него
+RUN useradd -u $uid -d /home/$user $user
+USER $user
+
+#ENTRYPOINT ["npm"]
+#CMD ["run", "prod"]
+# Масло масляное. Я бы написал одной строкой:
+
+ENTRYPOINT ["npm", "run", "prod"]
+
