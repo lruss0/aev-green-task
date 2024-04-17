@@ -1,0 +1,21 @@
+---
+- name: "Setup prometheus with postgresql on Debian 11 hosts"
+  hosts: all
+
+# export VAULT_ADDR=https://vault.service.consul:8200
+# export VAULT_TOKEN=cb347ae0-9eb4-85d1-c556-df43e82be4b0
+
+  vars:
+    #username: "{{ lookup('vault', 'secret/service_name/prod/database', 'username') }}"
+    #userpass: "{{ lookup('vault', 'secret/service_name/prod/database', 'password') }}"
+    username: test
+    userpass: test
+
+  tasks:
+
+    - name: "Create user"
+      user:
+        name: "{{ username }}"
+        password: "{{ userpass | password_hash('sha512') }}"
+
+
