@@ -2,6 +2,8 @@
 
 SERVICE_NAME=prometheus
 
+read -p "This will install $SERVICE_NAME. Press enter to continue..."
+
 cp $SERVICE_NAME.service /etc/systemd/system/
 chmod 644 /etc/systemd/system/$SERVICE_NAME.service
 
