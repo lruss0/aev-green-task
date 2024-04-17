@@ -17,7 +17,7 @@ else
     STATUS_CODE=`curl -sL -w "%{http_code}\n" "$SEARCH_URL" -o /dev/null`
     # Если код ответа HTTP 200 OK, тогда проверяем контент
     if [ "$STATUS_CODE" = "200" ]; then
-        # Вытаскиваем контент, в нижнем регистре все для удобства
+        # Вытаскиваем контент прогоняем через grep, регистронезависимо
         CHECK=`curl "$SEARCH_URL" --silent | grep -iF "$PATTERN"`
         if [ "$CHECK" = "" ]; then
             # HTTP 204 No Content
