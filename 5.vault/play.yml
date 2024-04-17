@@ -1,21 +1,28 @@
 ---
-- name: "Creating user"
+- name: "Test working with vault"
   hosts: all
 
-# export VAULT_ADDR=https://vault.service.consul:8200
-# export VAULT_TOKEN=cb347ae0-9eb4-85d1-c556-df43e82be4b0
+  # Использую плагин community.hashi_vault.hashi_vault
+  # https://docs.ansible.com/ansible/latest/collections/community/hashi_vault/hashi_vault_lookup.html#ansible-collections-community-hashi-vault-hashi-vault-lookup
+  # > ansible-galaxy collection install community.hashi_vault
+  #
+  # Переменную 'hashipass' получаю через опцию '-e' при вызове ansible-playbook в jenkins
+  # она будет иметь наивысший приоритет и перезапишет тестовые УД, указанные в плейбуке
 
   vars:
-    #username: "{{ lookup('vault', 'secret/service_name/prod/database', 'username') }}"
-    #userpass: "{{ lookup('vault', 'secret/service_name/prod/database', 'password') }}"
-    username: test
-    userpass: test
+    hashiuser: "hashiuser"
+    hashipass: "wrong_password"
 
   tasks:
 
-    - name: "Create user"
-      user:
-        name: "{{ username }}"
-        password: "{{ userpass | password_hash('sha512') }}"
+    - name: "Extracting data from vault"
+      vars:
+        ansible_hashi_vault_auth_method: userpass
+        ansible_hashi_vault_username: '{{ hashiuser }}'
+        ansible_hashi_vault_password: '{{ hashipass }}'
+      ansible.builtin.debug:
+        msg: '{{ item }}'
+      with_community.hashi_vault.vault_read:
+        - secret/data/test
 
 
