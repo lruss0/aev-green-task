@@ -1,5 +1,5 @@
 ---
-- name: "Setup prometheus with postgresql on Debian 11 hosts"
+- name: "Creating user"
   hosts: all
 
 # export VAULT_ADDR=https://vault.service.consul:8200
