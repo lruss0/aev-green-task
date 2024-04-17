@@ -10,19 +10,22 @@ ARG uid
 #ARG uid=1111
 
 # При билде в UBUNTU хочет часовой пояс, добавляю возможность указать
+# как-то можно вообще обойти этот запрос, но пока так
 ARG timezone
 #ARG timezone=Europe/Moscow
 ENV TZ=$timezone
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Добавил набор компоненты для билда, гит
-# Обычно еще ставлю openssl, ca-certificates, curl, но не стал включать в этот раз
-
+# Здесть можно еще включить компоненты, которые нередко нужны вместе с node.
+# Оставил их закомментированными, в задании в сборке их нет, без них работает
 RUN apt-get update -y && apt-get install -y \
-    git \
+#    git \
+#    build-essential \
+#    ca-certificates \
+#    openssl \
+#    curl \
     nodejs \
-    npm \
-    build-essential
+    npm
 
 # В конце можно почистить мусор после установки
 RUN apt clean & rm -rf /var/lib/apt/lists/*
@@ -43,9 +46,5 @@ EXPOSE 3000
 RUN useradd -u $uid -d /home/$user $user
 USER $user
 
-#ENTRYPOINT ["npm"]
-#CMD ["run", "prod"]
-# Масло масляное. Я бы написал одной строкой:
-
+# В задании разделены entrypint и cmd... Я бы написал одной строкой:
 ENTRYPOINT ["npm", "run", "prod"]
-
