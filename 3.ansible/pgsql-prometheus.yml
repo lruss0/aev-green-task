@@ -1,0 +1,177 @@
+---
+- name: "Setup prometheus with postgresql on Debian 11 hosts"
+
+  # По заданию 
+  # "Напишите простой ansible-скрипт по развороту Prometheus сервера с БД postgres на debian 11 c комментариями для выбранных шагов"
+  #
+  # Ниже "простой ansible-скрипт", без ролей, без дэбаг-сообщений и зависимостей тасков
+  # Предусмотрена проверка версии ОС
+  #
+  # В задании сказано: "Prometheus сервер с БД postgres", насколько мне удалось разобраться с прометеусом, он принципиально пишет данные в файлы
+  # на диске, не в БД. На сайте продукта не нашел кейсов по хранению его данных в БД. Могу ошибаться, раньше с ним не работал.
+  #
+  # В части настройки сбора статистики СУБД в прометеус в задании также не сказано. В данном случае можно добавить postgres exporter, но скрипт
+  # увеличится вдвое. При такой постановке задачи не понятен следующий шаг, и сделать лишнее может обернуться ошибкой.
+  #
+
+  # ПЛАН ДЕЙСТВИЙ:
+  # 1. Проверить версии операционки по фактам
+  # 2. Установить СУБД
+  # 3. Запустить сервис
+  # 4. Провести минимальную настройку СУБД
+  # 5. Закачать файлы прометеуса
+  # 6. Создать пользователей
+  # 7. Установить прометеус как сервис
+  # 8. Запустить сервис
+
+  hosts: debian_hosts
+  gather_facts: yes      # Принудительно собираю факты, чтобы удостовериться в том, какая версия системы
+  become: yes            # Нужно будет повышение для установки
+
+  vars:
+    db_user: prometheus                       # Параметры базы данных
+    db_password: prometheus
+    db_name: prometheus
+    service_user: prometheus                  # Под этой учеткой запущу демон прометея
+    prometheus_version: 2.51.2.linux-amd64    # Когда буду ставить прометея, чтобы много раз руками не набирать
+    debian_version: 11                        # Проверяемая версия Debian
+
+  tasks:
+
+      ########################
+      #  ПРОВЕРКА ВЕРСИИ ОС  #
+      ########################
+
+    - name: "Checking operating system version for Debian{{ debian_version }}"
+      # Получаю данные о версии ОС, если не совпадают с нужными, то end_play
+      meta: end_play
+      when: not (ansible_distribution == "Debian" and ansible_distribution_major_version == "{{ debian_version }}")
+
+      ########################
+      #  УСТАНОВКА ПОСТРГЕ   #
+      ########################
+
+    - name: "Install postgresql server"
+      # Так как мы в дебиане, то используем apt для установки
+      apt: "name={{ item }} state=present"
+      with_items:
+        - postgresql
+        - postgresql-contrib
+
+    - name: "Install python packages for ansible needs"
+      # Дополнительные компоненты python для взаимодействия с postgresql.
+      # Предполагаю, что python установлен на целевой машине
+      # Можно сделать еще предварителную проверку и доставить, то там следом потянутся build-essentials и прочеее
+      pip: "name={{ item }} state=present"
+      with_items:
+        - psycopg2-binary
+
+    - name: "Start services"
+      # Пробуем запустить сервер БД. Теоретически, можно еще проверить, нормально ли прошла инициализация, но не в этот раз
+      service: name={{item}} state=started enabled=yes
+      with_items:
+        - postgresql
+
+    - name: "Create app database"
+      # Создаем базу данных
+      # Помним, что надо переключиться на pgsql ))
+      postgresql_db:
+        state: present
+        name: "{{ db_name }}"
+      become: yes
+      become_user: postgres
+
+    - name: "Create db user"
+      # Создаем пользователя
+      postgresql_user:
+        state: present
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+      become: yes
+      become_user: postgres
+
+    - name: "Grant privileges"
+      # Выдаем привилегии на базу
+      postgresql_privs:
+        type: database
+        database: "{{ db_name }}"
+        roles: "{{ db_user }}"
+        grant_option: no
+        privs: all
+      become: yes
+      become_user: postgres
+
+      ########################
+      #  УСТАНОВКА ПРОМЕТЕЯ  #
+      ########################
+
+    - name: "Unarchive files to remote /opt"
+      # Закидываю заранее подготовленный архив
+      # Можно затянуть и прямо по URL, если есть доступный repo
+      # По-хорошему надо предварительно проверить целевую папку, вдуг там уже есть прометей, но в следующий раз
+      unarchive:
+        src: "{{ item }}"
+        dest: /opt
+      with_items:
+        - prometheus-{{ prometheus_version }}.tar.gz
+
+    - name: "Rename Prometheus directory"
+      # Убираю из имени номер версии
+      command: mv /opt/prometheus-{{ prometheus_version }} /opt/prometheus
+
+    - name: "Create prometheus system group"
+      # Создаем группу и пользователя для прометея
+      group:
+        name: "{{ service_user }}"
+        system: yes
+
+    - name: "Create prometheus system user"
+      # Создаем группу и пользователя для прометея
+      # Пользователь no-login
+      user:
+        name: "{{ service_user }}"
+        system: yes
+        shell: "/sbin/nologin"
+        group: "{{ service_user }}"
+        createhome: no
+
+    - name: "Set privileges"
+      # Теперь права на папку, рекурсивно.
+      # Здесь и выше можно еще добавить обрабтку события, что на целевом хосте уже есть прометей, но это прилично усложнит сценарий
+      file:
+        path: /opt/prometheus
+        state: directory
+        recurse: yes
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+
+    - name: "Create systemd units from templates"
+      # Шаблоном закидываю systemd unit. В шаблоне подставляется пользователь. Т.е. снова можно сделать сначала проверку when stat exists user_created
+      template:
+        src: "{{ item }}.service.j2"
+        dest: /etc/systemd/system/{{ item }}.service
+        owner: root
+        group: root
+        mode: 0644
+      with_items:
+        - prometheus
+
+    - name: "Create logging configuration"
+      # Кастомные настройки журналов
+      template:
+        src: "{{ item }}.log.conf.j2"
+        dest: /etc/systemd/system/10-{{ item }}.conf
+        owner: root
+        group: root
+        mode: 0644
+      with_items:
+        - prometheus
+
+    - name: "Start services"
+      # Запускаем прометей
+      service: name={{ item }} state=started enabled=yes
+      with_items:
+        - prometheus
+
+
+

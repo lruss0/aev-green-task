@@ -1,0 +1,4 @@
+template(name="clean" type="string" string="%msg:2:$:drop-last-lf%\n")
+
+if $programname == 'prometheus' then action(type="omfile" file="/var/log/prometheus.log" template="clean")
+& stop
