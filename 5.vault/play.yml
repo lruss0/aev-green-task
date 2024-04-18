@@ -7,19 +7,16 @@
   # > ansible-galaxy collection install community.hashi_vault
   #
   # Переменную 'hashipass' получаю через опцию '-e' при вызове ansible-playbook в jenkins
-  # она будет иметь наивысший приоритет и перезапишет тестовые УД, указанные в плейбуке
-
-  vars:
-    hashiuser: "hashiuser"
-    hashipass: "wrong_password"
 
   tasks:
 
     - name: "Extracting data from vault"
       vars:
+        ansible_hashi_vault_url: "http://localhost:8200"
+        # ansible_hashi_vault_auth_method: token
         ansible_hashi_vault_auth_method: userpass
-        ansible_hashi_vault_username: '{{ hashiuser }}'
-        ansible_hashi_vault_password: '{{ hashipass }}'
+        ansible_hashi_vault_username: "ansible_service"
+        ansible_hashi_vault_password: "{{ hashipass }}"
       ansible.builtin.debug:
         msg: '{{ item }}'
       with_community.hashi_vault.vault_read:
