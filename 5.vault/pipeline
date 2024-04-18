@@ -2,9 +2,18 @@ pipeline {
     agent any
 
     stages {
-        stage('Deploy') {
+        stage('Deploy ansible playbook') {
             steps {
-                sh 'ansible-playbook --extra-vars "hashipass=ha$hip@$$w0rd" play.yml'
+                withCredentials([string(credentialsId: 'hashipass', variable: 'PASS')]) {
+                    ansiblePlaybook([
+                        inventory: 'debian_hosts',
+                        playbook: 'play.yml',
+                        installation: 'ansible',
+                        extraVars: [
+                            hashipass: $PASS,
+                        ]
+                    ])
+                }
             }
         }
     }
