@@ -1,0 +1,30 @@
+pipeline {
+    agent any
+
+    environment {
+        VAULT_ADDR="http://127.0.0.1:8200"
+        ROLE_ID="c4cec819-eae2-ca98-b312-46fcfe322c7c"
+        SECRET_ID=credentials("SECRET_ID")
+        SECRETS_PATH="secrets/data/test"
+    }
+
+    stages {
+        stage('Deploy ansible playbook') {
+            steps {
+                export PATH=/usr/local/bin:${PATH}
+                // получаем токен от vault для доступа к SECRET_PATH
+                curl --request POST \
+                    --data "{ \"role_id\": \"$ROLE_ID\", \"secret_id\": \"$SECRET_ID\" }" \
+                    ${VAULT_ADDR}/v1/auth/approle/login > login.json
+                VAULT_TOKEN=$(cat login.json | jq -r .auth.client_token)
+
+                ansiblePlaybook credentialsId: 'Ansible-Run-User',
+                disableHostKeyChecking: true, 
+                inventory: 'debian_hosts',
+                playbook: 'play.yml',
+                installation: 'ansible',
+                extras: "-e VAULT_TOKEN=$VAULT_TOKEN,VAULT_ADDR=${VAULT_ADDR}"
+            }
+        }
+    }
+}
